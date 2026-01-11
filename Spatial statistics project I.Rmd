@@ -1,0 +1,218 @@
+---
+title: "Spatial Data Visualization and Spatial Autocorrelation Analysis of Administrative Zones in Ethiopia"
+author: "Kibruyisfa"
+date: "2025-11-18"
+output: html_document
+---
+# Applied Spatial Analysis project 
+
+
+# Question 1 
+
+## Download and visualize/map the following vector spatial datasets  
+
+## Load required packages
+```{r}
+library(sf)
+library(ggplot2)
+```
+
+
+##Assign and read administrative regions and zones shapefiles:
+```{r}
+Ethiopian_Regions <- st_read("E:/kibru file/ACADAMICAL MATERIALS/4th year materials/Aplied Spatial Data Analysis/ASDA/Data/ShapeFiles/Ethadmin2023/Ethadmin1_23/ET_Admin1_2023.shp")
+Ethiopian_Zones <- st_read("E:/kibru file/ACADAMICAL MATERIALS/4th year materials/Aplied Spatial Data Analysis/ASDA/Data/ShapeFiles/Ethadmin2023/Ethadmin2_23/ET_Admin2_2023.shp")
+```
+
+
+###i) Draws the regions and zones of Ethiopia:
+```{r}
+ggplot() +
+  geom_sf(data = Ethiopian_Regions, fill = "green", alpha = 0.3) +
+  geom_sf(data = Ethiopian_Zones, fill = NA, color = "gray40", linewidth = 0.3) +
+  labs(title = "Ethiopia Administrative Boundaries",
+       subtitle = "Regional and Zonal Levels") +
+  theme_minimal()
+```
+
+
+###ii) The number of zones Ethiopia has:
+```{r}
+nrow(Ethiopian_Zones)
+```
+
+
+###iii) The map of Amhara: 
+
+## Assign and filters Amhara region and zones:
+```{r}
+Amhara_Region <- Ethiopian_Regions[Ethiopian_Regions$ADMIN1 == "Amhara", ]
+Amhara_Zone <- Ethiopian_Zones[Ethiopian_Zones$ADMIN1 == "Amhara", ]
+
+```
+
+## Plots the region and zones of Amhara: 
+```{r}
+ggplot() +
+  geom_sf(data = Amhara_Region, fill = NA, color = "yellow") +
+  geom_sf(data = Amhara_Zone, fill = "lightblue", color = "black") +
+  ggtitle("Amhara Region - Administrative Map")
+```
+
+  
+  
+# Question 2 
+
+
+##(c) Map the Raster/grided spatial datasets of  “Ethiopia Walking Travel Time to nearest Level IV health center”
+
+### Load required package
+```{r}
+library(terra)
+```
+
+
+### We use rast files
+```{r}
+ETH_walk <- rast("E:/kibru file/ACADAMICAL MATERIALS/4th year materials/Aplied Spatial Data Analysis/ASDA/Data/service_area_Ethiopia_walking.tif")
+plot(ETH_walk) 
+```
+
+
+
+# Question 3    
+
+##Load the requird package:
+```{r}
+library(sf)
+```
+
+
+## We create our own data frame:
+```{r}
+points <- data.frame(
+  id = 1:5,
+  long = c(37.5, 36.45, 44.3, 42, 43.65),
+  lat = c(4, 6, 8, 10, 12)
+)
+points
+```
+
+
+## convert spatial points with WGS84 (longitude (long)/latitude(lat)) 
+```{r}
+points_sf <- st_as_sf(points, coords = c("long", "lat"), crs = 4326)
+
+```
+
+## check
+```{r}
+st_crs(points_sf)
+```
+
+
+### convert to project crs
+```{r}
+points_proj <- st_transform(points_sf, crs = 32637)
+```
+
+
+### check if it is converted
+```{r}
+st_crs(points_proj)
+
+```
+
+
+### project both the projected and unprojected part
+```{r}
+ggplot() + geom_sf(data = points_sf, color = "purple") + ggtitle("Points in Geographic CRS (EPSG:4326)")
+ggplot() + geom_sf(data = points_proj, color = "orange") + ggtitle("Points in Projected CRS (EPSG:32637)")
+```
+
+
+
+
+# Question 4     
+  
+## Disable spherical geometry operations so it can fix geometric error
+```{r}
+sf_use_s2(FALSE)
+```
+
+
+## Ensure valid geometry for spatial operations to fix invalied geometry
+```{r}
+Amhara_Zone_valid <- st_make_valid(Amhara_Zone)
+```
+
+
+##load the required package
+```{r}
+library(spdep)
+```
+
+
+###Neighbor list based on contiguity
+```{r}
+Amhara_nb <- poly2nb(Amhara_Zone, queen = TRUE, row.names = Amhara_Zone$ADMIN2)
+
+```
+
+### Points inside each polygon for plotting links
+```{r}
+center <- st_point_on_surface(Amhara_Zone)
+coordinates <- st_coordinates(center)
+
+```
+
+### Plot zone boundaries of Amhara
+```{r}
+plot(st_geometry(Amhara_Zone),
+     border = "gray50",
+     main = "Neighbor among Amhara Zones")
+```
+
+
+## connects neighborhood with a red line from the center
+```{r}
+plot(Amhara_nb, coords = coordinates, add = TRUE, col = "blue", lwd = 1)
+```
+
+
+##Create spatial weights matrix from neighborhood list
+```{r}
+Amhara_weight <- nb2listw(Amhara_nb, style = "W")
+summary(Amhara_weight)
+
+```
+
+
+# Question 5      
+
+```{r}
+set.seed(4121)
+```
+
+
+## healthcare coverage data across zones of Amhara:
+```{r}
+Amhara_Zone$health_coverage <- runif(nrow(Amhara_Zone), 20, 80) + rnorm(nrow(Amhara_Zone), 0, 5)
+```
+
+
+## Plots distribution of healthcare coverage accross Amhara zones: 
+```{r}
+plot(Amhara_Zone["health_coverage"], main = "Healthcare Coverage by Zone (Amhara)")
+```
+
+
+## Moran's I test
+```{r}
+moran_health <- moran.test(Amhara_Zone$health_coverage, Amhara_weight)
+moran_health
+```
+
+
+
+```
